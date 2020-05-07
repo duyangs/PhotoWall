@@ -615,6 +615,12 @@ class PhotoWall : RelativeLayout {
     private fun createImageView():PhotoWallImageView{
         val imageView = PhotoWallImageView(context)
         imageView.setScaleType(ImageView.ScaleType.FIT_XY)
+        imageView.setOnDeleteListener(object :PhotoWallImageView.OnClickListener{
+            override fun onClick(view: PhotoWallImageView) {
+                imageViewList.remove(view)
+                removeView(view)
+            }
+        })
         return imageView
     }
 }
