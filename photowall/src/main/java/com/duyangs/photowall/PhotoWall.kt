@@ -272,7 +272,6 @@ class PhotoWall : RelativeLayout, PhotoWallImpl {
     }
 
     /**
-     * todo  此方法需要修改
      * 复原图
      * @param photoWallEntity 图片墙实体[PhotoWallEntity]
      */
@@ -315,6 +314,15 @@ class PhotoWall : RelativeLayout, PhotoWallImpl {
                 removeView(view)
             }
         })
+    }
+
+    /**
+     * 清空
+     */
+    fun clear(){
+        imageList.clear()
+        imageViewList.clear()
+        removeAllViews()
     }
 
     interface OnPhotoWallDisplayListener {

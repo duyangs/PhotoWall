@@ -26,14 +26,14 @@ class MainActivity : AppCompatActivity() {
         setPhotoWallDisplayListener()
     }
 
-    private fun setPhotoWallDisplayListener(){
-        photo_wall.setOnPhotoWallDisplayListener(object :PhotoWall.OnPhotoWallDisplayListener{
+    private fun setPhotoWallDisplayListener() {
+        photo_wall.setOnPhotoWallDisplayListener(object : PhotoWall.OnPhotoWallDisplayListener {
             override fun onDisplay(
                 context: Context,
                 path: String,
                 callback: PhotoWall.OnPhotoWallDisplayCallback
             ) {
-                callback.onDisplayCallback(getBmpFromDrawable(this@MainActivity,R.mipmap.timg))
+                callback.onDisplayCallback(getBmpFromDrawable(this@MainActivity, R.mipmap.timg))
             }
         })
     }
@@ -42,28 +42,32 @@ class MainActivity : AppCompatActivity() {
         return BitmapFactory.decodeResource(context.resources, resId)
     }
 
-    private fun addImage(){
+    private fun addImage() {
         photo_wall.setImage("")
     }
 
-    private fun saveImage(){
+    private fun saveImage() {
         reductionList.clear()
         reductionList.addAll(photo_wall.getImages())
         val jsonArray = Gson().toJson(reductionList)
-        Log.d("MainActivity","json format $jsonArray")
+        Log.d("MainActivity", "json format $jsonArray")
     }
 
-    private fun reductionImage(){
+    private fun reductionImage() {
         photo_wall.recoveryImage(reductionList)
     }
 
+    private fun clearImage() {
+        photo_wall.clear()
+    }
+
     override fun onCreateOptionsMenu(menu: Menu?): Boolean {
-        menuInflater.inflate(R.menu.menu_main,menu)
+        menuInflater.inflate(R.menu.menu_main, menu)
         return true
     }
 
     override fun onOptionsItemSelected(item: MenuItem): Boolean {
-        return when(item.itemId) {
+        return when (item.itemId) {
             R.id.action_add -> {
                 addImage()
                 true
@@ -74,6 +78,10 @@ class MainActivity : AppCompatActivity() {
             }
             R.id.action_reduction -> {
                 reductionImage()
+                true
+            }
+            R.id.action_clear -> {
+                clearImage()
                 true
             }
             else -> super.onOptionsItemSelected(item)

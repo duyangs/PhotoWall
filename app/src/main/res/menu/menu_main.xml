@@ -16,4 +16,9 @@
         android:id="@+id/action_reduction"
         android:title="@string/reduction"
         app:showAsAction="never"/>
+
+    <item
+        android:id="@+id/action_clear"
+        android:title="@string/clear"
+        app:showAsAction="never"/>
 </menu>
