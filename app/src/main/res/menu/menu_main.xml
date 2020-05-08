@@ -6,4 +6,14 @@
         android:id="@+id/action_add"
         android:title="@string/add"
         app:showAsAction="never" />
+
+    <item
+        android:id="@+id/action_save"
+        android:title="@string/save"
+        app:showAsAction="never"/>
+
+    <item
+        android:id="@+id/action_reduction"
+        android:title="@string/reduction"
+        app:showAsAction="never"/>
 </menu>

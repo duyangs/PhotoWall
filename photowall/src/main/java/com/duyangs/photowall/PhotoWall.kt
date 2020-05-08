@@ -8,7 +8,6 @@ import android.util.AttributeSet
 import android.util.Log
 import android.view.MotionEvent
 import android.view.View
-import android.widget.ImageView
 import android.widget.RelativeLayout
 
 /**
@@ -22,7 +21,7 @@ class PhotoWall : RelativeLayout, PhotoWallImpl {
 
     companion object {
         private const val TAG = "PhotoWall"
-        private const val SCALE_RATIO = 400f //计算缩放比例的参数
+        private const val SCALE_RATIO = 5000f //计算缩放比例的参数
         private const val SCALE_MIN = 0.5f //最小允许缩放
         const val SCALE_DEFAULT = 1f //默认缩放
     }
@@ -33,15 +32,14 @@ class PhotoWall : RelativeLayout, PhotoWallImpl {
     private var mPointerDownDistance = 0f
     private var isSliding = false
     private var isScaling = false
-    private var mLastScale = 1f
-    private var finalScale = 1f
     private var isScalable = true
     private var isDraggable = true
     var mScaleMax: Float = 2f //最大允许缩放
 
     /* 图片Bitmap */
     private var imageViewList = arrayListOf<PhotoWallImageView>()
-//    private var imgBitmap: Bitmap? = null
+    private var imageList = arrayListOf<PhotoWallEntity>()
+    private var onPhotoWallDisplayListener: OnPhotoWallDisplayListener? = null
 
     constructor(context: Context) : super(context) {
         init()
@@ -78,10 +76,10 @@ class PhotoWall : RelativeLayout, PhotoWallImpl {
      * @param y 当前触摸点y
      * @return [PhotoWallImageView] 返回受作用的PhotoWallImageView
      */
-    private fun inspectionImageRange(x: Float, y: Float): PhotoWallImageView? {
+    private fun inspectionImageRange(x: Float, y: Float): Int? {
         for (i in (imageViewList.size - 1) downTo 0) {
             val iv = imageViewList[i]
-            if (inspectionImageRange(x, y, iv, this)) return iv
+            if (inspectionImageRange(x, y, iv, this)) return i
         }
         return null
     }
@@ -89,14 +87,15 @@ class PhotoWall : RelativeLayout, PhotoWallImpl {
     @SuppressLint("ClickableViewAccessibility")
     override fun onTouchEvent(event: MotionEvent): Boolean {
         if (!isEnabled) return super.onTouchEvent(event)
-        val iv = inspectionImageRange(event.x, event.y)
-        iv?.let {
+        val position = inspectionImageRange(event.x, event.y)
+        position?.let {
             return onTouchEventImpl(it, event)
         }
         return super.onTouchEvent(event)
     }
 
-    private fun onTouchEventImpl(iv: PhotoWallImageView, event: MotionEvent): Boolean {
+    private fun onTouchEventImpl(position: Int, event: MotionEvent): Boolean {
+        val photoWallImageView = imageViewList[position]
         when (event.actionMasked) {
             MotionEvent.ACTION_DOWN -> {
                 isSliding = false
@@ -107,7 +106,7 @@ class PhotoWall : RelativeLayout, PhotoWallImpl {
                     if (event.pointerCount == 2) {
                         isScaling = true
                         calcScale(
-                            iv, getDistance(
+                            position, photoWallImageView, getDistance(
                                 PointF(event.getX(1), event.getY(1)),
                                 PointF(event.getX(0), event.getY(0))
                             )
@@ -121,13 +120,13 @@ class PhotoWall : RelativeLayout, PhotoWallImpl {
                 if (isDraggable) {
                     if (event.pointerCount == 1) {
                         if (!isScaling) {
-                            slide(iv, event.x, event.y)
+                            slide(photoWallImageView, event.x, event.y)
                         }
                     }
                 }
             }
             MotionEvent.ACTION_POINTER_DOWN -> {
-                mLastScale = iv.scaleX
+                imageList[position].scale = photoWallImageView.scaleX
                 mPointerLastDownPoint = PointF(
                     event.getX(1), event.getY(1)
                 )
@@ -135,8 +134,8 @@ class PhotoWall : RelativeLayout, PhotoWallImpl {
                     mLastMovePoint, mPointerLastDownPoint!!
                 )
                 //图片没有缩放时才设置Pivot
-                if (iv.scaleX == 1f) {
-                    setPivot(iv, mLastMovePoint, mPointerLastDownPoint!!)
+                if (photoWallImageView.scaleX == 1f) {
+                    setPivot(photoWallImageView, mLastMovePoint, mPointerLastDownPoint!!)
                 }
             }
             MotionEvent.ACTION_POINTER_UP -> {
@@ -146,7 +145,7 @@ class PhotoWall : RelativeLayout, PhotoWallImpl {
                     performClick()
                 }
                 clearPointerState()
-                repairImageLocation(iv)
+                repairImageLocation(photoWallImageView)
             }
         }
         return true
@@ -154,17 +153,22 @@ class PhotoWall : RelativeLayout, PhotoWallImpl {
 
     /**
      * 设置图片的Bitmap
-     * @param imgBitmap 图片 [Bitmap]
+     * @param path 图片地址
      */
-    fun setImage(imgBitmap: Bitmap?) {
-        post {
-            val imageView = createImageView()
-            imageViewList.add(imageView)
-            this.setImageLocation(imageView)
-            val newBm = getFitImageViewBitmap(imageView, this, imgBitmap)
-            imageView.setImageBitmap(newBm)
-            addView(imageView)
-        }
+    fun setImage(path: String) {
+        onPhotoWallDisplayListener?.onDisplay(context, path, object : OnPhotoWallDisplayCallback {
+            override fun onDisplayCallback(bitmap: Bitmap) {
+                post {
+                    imageList.add(PhotoWallEntity(floatArrayOf(0f, 0f), 1f, path))
+                    val imageView = createImageView()
+                    imageViewList.add(imageView)
+                    this@PhotoWall.setImageLocation(imageView)
+                    val newBm = getFitImageViewBitmap(imageView, this@PhotoWall, bitmap)
+                    imageView.setImageBitmap(newBm)
+                    addView(imageView)
+                }
+            }
+        })
     }
 
     /**
@@ -201,25 +205,27 @@ class PhotoWall : RelativeLayout, PhotoWallImpl {
      *
      * @param currentDistance 当前手指的距离
      */
-    private fun calcScale(iv: PhotoWallImageView, currentDistance: Float) {
+    private fun calcScale(position: Int, iv: PhotoWallImageView, currentDistance: Float) {
         val rate = (currentDistance - mPointerDownDistance) / SCALE_RATIO
-        val scale = mLastScale + rate
+        val scale = imageList[position].scale + rate//imageList[position].mLastScale + rate
         val scaleRatio = scale.coerceAtLeast(SCALE_MIN)
-        scale(iv, scaleRatio)
+        Log.d(TAG, "calcScale rate $rate scale $scale scaleRatio $scaleRatio")
+        scale(position, iv, scaleRatio)
     }
 
     /**
      * 缩放
      * @param ratio 缩放比例 [Float]
      */
-    private fun scale(iv: PhotoWallImageView, ratio: Float) {
+    private fun scale(position: Int, iv: PhotoWallImageView, ratio: Float) {
         iv.scaleX = ratio
         iv.scaleY = ratio
-        finalScale = if (ratio > mScaleMax) {
+        val scale = if (ratio > mScaleMax) {
             iv.animate().scaleX(mScaleMax).scaleY(mScaleMax)
             mScaleMax
         } else ratio
-        iv.setDeleteBtnScale(finalScale)
+        imageList[position].scale = scale
+        iv.setDeleteBtnScale(scale)
     }
 
     /**
@@ -246,65 +252,76 @@ class PhotoWall : RelativeLayout, PhotoWallImpl {
     }
 
     /**
-     * todo  此方法需要修改
-     * 获取当前缩放比
+     * 获取当前图片列表
      */
-    fun getScale(): Float = finalScale
-
-    /**
-     * todo  此方法需要修改
-     * 获取当前图片位于Parent相对位置坐标
-     */
-    fun getRelativeLocation(): ArrayList<FloatArray> {
-        val relativeLocationList = arrayListOf<FloatArray>()
-        for (iv in imageViewList) {
+    fun getImages(): ArrayList<PhotoWallEntity> {
+        for (i in 0 until imageViewList.size) {
+            val iv = imageViewList[i]
             val location = getImageLocation(iv, this)
             val relativeX = location[0] / width
             val relativeY = location[1] / height
-            relativeLocationList.add(floatArrayOf(relativeX, relativeY))
+            imageList[i].relativeLocation = floatArrayOf(relativeX, relativeY)
         }
-        return relativeLocationList
+        return imageList
+    }
+
+    fun recoveryImage(entityList: List<PhotoWallEntity>) {
+        for (entity in entityList) {
+            recoveryImage(entity)
+        }
     }
 
     /**
      * todo  此方法需要修改
      * 复原图
-     * @param bitmap [Bitmap] 图片
-     * @param relativeLocation 相对父布局坐标比 数组 长度为2
-     * @param scale 原缩放比
+     * @param photoWallEntity 图片墙实体[PhotoWallEntity]
      */
-    fun recoveryImage(bitmap: Bitmap, relativeLocation: FloatArray, scale: Float) {
-        post {
-            val imageView = createImageView()
-            imageViewList.add(imageView)
-            recoveryImage(imageView, this, bitmap, relativeLocation, scale)
-            val newBm = getFitImageViewBitmap(imageView, this, bitmap)
-            imageView.setImageBitmap(newBm)
-            mLastScale = scale
-            finalScale = scale
-        }
+    fun recoveryImage(photoWallEntity: PhotoWallEntity) {
+        onPhotoWallDisplayListener?.onDisplay(
+            context,
+            photoWallEntity.path,
+            object : OnPhotoWallDisplayCallback {
+                override fun onDisplayCallback(bitmap: Bitmap) {
+                    imageList.add(photoWallEntity)
+                    post {
+                        val imageView = createImageView()
+                        val newBm = getFitImageViewBitmap(imageView, this@PhotoWall, bitmap)
+                        imageView.setImageBitmap(newBm)
+                        imageViewList.add(imageView)
+                        addView(imageView)
+                        imageView.post {
+                            recoveryImage(
+                                imageView,
+                                this@PhotoWall,
+                                photoWallEntity.relativeLocation,
+                                photoWallEntity.scale
+                            )
+                        }
+                    }
+                }
+            })
+    }
 
+    fun setOnPhotoWallDisplayListener(listener: OnPhotoWallDisplayListener) {
+        this.onPhotoWallDisplayListener = listener
     }
 
     private fun createImageView(): PhotoWallImageView {
         return createImageView(context, object : PhotoWallImageView.OnClickListener {
             override fun onClick(view: PhotoWallImageView) {
+                val position = imageViewList.indexOf(view)
+                if (position > -1) imageList.removeAt(position)
                 imageViewList.remove(view)
                 removeView(view)
             }
         })
     }
 
-    /**
-     * 图片显示监听 用于开放图片加载方式
-     */
-    interface OnDisplayImageListener {
-        /**
-         * 显示图片
-         * @param context 上下文 [Context]
-         * @param img 图片 [Any]
-         * @param iv [ImageView]
-         */
-        fun onDisplayImage(context: Context, img: Any, iv: ImageView)
+    interface OnPhotoWallDisplayListener {
+        fun onDisplay(context: Context, path: String, callback: OnPhotoWallDisplayCallback)
+    }
+
+    interface OnPhotoWallDisplayCallback {
+        fun onDisplayCallback(bitmap: Bitmap)
     }
 }

@@ -173,7 +173,7 @@ interface PhotoWallImpl {
     }
 
     /**
-     * 判断当前触摸点是否作用与PhotoWallImageView
+     * 判断当前触摸点是否作用与image
      * @param x 当前触摸点x
      * @param y 当前触摸点y
      * @param iv [PhotoWallImageView]
@@ -270,18 +270,15 @@ interface PhotoWallImpl {
     }
 
     /**
-     * todo  此方法需要修改
      * 复原ImageView位置
      * @param iv [PhotoWallImageView]
      * @param pw [PhotoWall]
-     * @param bm [Bitmap] 图片
      * @param relativeLocation 相对父布局坐标比 数组 长度为2
      * @param scale 原缩放比
      */
     fun recoveryImage(
         iv: PhotoWallImageView,
         pw: PhotoWall,
-        bm: Bitmap,
         relativeLocation: FloatArray,
         scale: Float
     ) {
@@ -295,35 +292,29 @@ interface PhotoWallImpl {
         /**
          * 缩放会基于中心点，所以直接移动缩放后 如果scale值不为1 则会发生偏移
          * 通过计算图片尺寸及缩放比 在移动过程中减去差值
-         * @param translation 根据记录坐标得到的移动距离
          * @param originSize 原始尺寸 width height
+         * @param relativeLocation 记录的坐标位置 x or y
+         * @return x or y 轴移动距离
          */
-        fun translation(translation: Float, originSize: Float): Float {
-            // 计算移动距离 - （（原尺寸 - 缩放后尺寸）/ 2 )
-            val trans = translation - ((originSize - scaleSize(originSize)) / 2)
-            return if (trans > 0) trans else 0f
+        fun translation(originSize: Float, relativeLocation: Float): Float {
+            val currentOrigin = (originSize - scaleSize(originSize)) / 2
+            return relativeLocation - currentOrigin
         }
 
         val maxDistance = getMaxDistance(
             iv,
             pw,
-            scaleSize(bm.width.toFloat()),
-            scaleSize(bm.height.toFloat())
+            scaleSize(iv.width.toFloat()),
+            scaleSize(iv.height.toFloat())
         )
-        val translationX = translation(relativeLocation[0] * pw.width, bm.width.toFloat())
-        val translationY =
-            translation(relativeLocation[1] * pw.height, bm.height.toFloat())
+        val translationX = translation(iv.width.toFloat(), relativeLocation[0] * pw.width)
+        val translationY = translation(iv.height.toFloat(), relativeLocation[1] * pw.height)
         this.setImageLocation(
             iv,
             scale,
-            if (translationX > maxDistance[0])
-                translation(
-                    maxDistance[0], bm.width.toFloat()
-                ) else translationX,
-            if (translationY > maxDistance[1])
-                translation(
-                    maxDistance[1], bm.height.toFloat()
-                ) else translationY
+            if (translationX > maxDistance[0]) maxDistance[0] else translationX,
+            if (translationY > maxDistance[1]) maxDistance[1] else translationY
         )
+        iv.setDeleteBtnScale(scale)
     }
 }
