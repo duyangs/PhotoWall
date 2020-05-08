@@ -14,9 +14,6 @@ import android.view.View
 import android.view.ViewGroup
 import android.widget.ImageView
 import android.widget.RelativeLayout
-import kotlin.math.abs
-import kotlin.math.pow
-import kotlin.math.sqrt
 
 /**
  * Project: PhotoWall 拖动 缩放 ImageView 支持多张
@@ -25,7 +22,7 @@ import kotlin.math.sqrt
  * Date: 2020/5/7 11:05 ( Thursday May )
  * Description:
  */
-class PhotoWall : RelativeLayout {
+class PhotoWall : RelativeLayout, PhotoWallImpl {
 
     companion object {
         private const val TAG = "PhotoWall"
@@ -48,17 +45,13 @@ class PhotoWall : RelativeLayout {
 
     /* 图片Bitmap */
     private var imageViewList = arrayListOf<PhotoWallImageView>()
-
-    //    private lateinit var mImageView: ImageView
 //    private var imgBitmap: Bitmap? = null
 
     constructor(context: Context) : super(context) {
-//        LayoutInflater.from(context).inflate(R.layout.photo_wall, this)
         init()
     }
 
     constructor(context: Context, set: AttributeSet) : super(context, set) {
-//        LayoutInflater.from(context).inflate(R.layout.photo_wall, this)
         init()
     }
 
@@ -67,7 +60,6 @@ class PhotoWall : RelativeLayout {
         set,
         defStyleAttr
     ) {
-//        LayoutInflater.from(context).inflate(R.layout.photo_wall, this)
         init()
     }
 
@@ -75,43 +67,13 @@ class PhotoWall : RelativeLayout {
     private fun init() {
         Log.d(TAG, "init: ")
         setWillNotDraw(false)
-//        mImageView = findViewById(R.id.d_z_image_view)
     }
-
-//    override fun onDraw(canvas: Canvas) {
-//        Log.d(TAG, "onDraw: ")
-//        super.onDraw(canvas)
-//        Log.d(TAG, "parent width $width")
-//        Log.d(TAG, "parent height $height")
-//        Log.d(TAG, "mI.width ${mImageView.width}")
-//        Log.d(TAG, "mI.height ${mImageView.height}")
-//    }
 
     override fun setEnabled(enabled: Boolean) {
         super.setEnabled(enabled)
         for (iv in imageViewList) {
             iv.isEnabled = enabled
         }
-    }
-
-//    override fun onInterceptTouchEvent(ev: MotionEvent?): Boolean {
-//        return if (!isEnabled) false else super.onInterceptTouchEvent(ev)
-//    }
-
-    /**
-     * 获取image当前范围
-     * @return [FloatArray] 范围数组，长度为4 按顺序依次为 startX endX startY endY
-     */
-    private fun getImageRange(iv: PhotoWallImageView): FloatArray {
-        val imageLoc = getImageLocation(iv)
-        val endX = imageLoc[0] + getImageWidth(iv)
-        val endY = imageLoc[1] + getImageHeight(iv)
-        val imageRangeArray = FloatArray(4)
-        imageRangeArray[0] = imageLoc[0] //startX
-        imageRangeArray[1] = endX
-        imageRangeArray[2] = imageLoc[1] //startY
-        imageRangeArray[3] = endY
-        return imageRangeArray
     }
 
     /**
@@ -123,7 +85,7 @@ class PhotoWall : RelativeLayout {
     private fun inspectionImageRange(x: Float, y: Float): PhotoWallImageView? {
         for (i in (imageViewList.size - 1) downTo 0) {
             val iv = imageViewList[i]
-            val imageRangeArray = getImageRange(iv)
+            val imageRangeArray = getImageRange(iv, this)
             if ((x >= imageRangeArray[0]) and (x <= imageRangeArray[1]) and (y >= imageRangeArray[2]) and (y <= imageRangeArray[3])) {
                 return iv
             }
@@ -302,7 +264,7 @@ class PhotoWall : RelativeLayout {
     private fun repairImageLocation(iv: PhotoWallImageView) {
         //缩放<=1时：图片位置超出边界，回弹至边界
         if (iv.scaleX <= 1) {
-            val boundaryOffset = getBoundaryOffset(iv)
+            val boundaryOffset = getBoundaryOffset(iv, this)
             if (boundaryOffset[0] != -1f) iv.animate().translationX(boundaryOffset[0])
             if (boundaryOffset[1] != -1f) iv.animate().translationY(boundaryOffset[1])
         } else { //缩放>1时：图片边界回到原位置。
@@ -408,122 +370,19 @@ class PhotoWall : RelativeLayout {
     }
 
     /**
-     * 获取图片宽度 图片原宽度 * 图片缩放比
-     */
-    private fun getImageWidth(iv: PhotoWallImageView) = iv.width * iv.scaleX
-
-    /**
-     * 获取图片高度 图片原高度 * 图片缩放比
-     */
-    private fun getImageHeight(iv: PhotoWallImageView) = iv.height * iv.scaleY
-
-    /**
-     * 获取ImageView基于父布局的位置（通过ImageView基于屏幕位置与父布局基于屏幕位置计算差值）
-     */
-    private fun getImageLocation(iv: PhotoWallImageView): FloatArray {
-        val imageLocation = IntArray(2)
-        iv.getLocationOnScreen(imageLocation)
-        val parentLocation = IntArray(2)
-        getLocationOnScreen(parentLocation)
-        val x =
-            imageLocation[0] - parentLocation[0] // mImageView距离Parent左边的距离（即x轴方向） image.x - parent.x
-        val y =
-            imageLocation[1] - parentLocation[1] // mImageView距离Parent顶边的距离（即y轴方向） image.y - parent.y
-        Log.d(TAG, "getImageLocation v.x $x v.y $y")
-        return floatArrayOf(x.toFloat(), y.toFloat())
-    }
-
-    /**
-     * 获取最大移动距离，
-     * maxXDistance = parent.w - image.w
-     * maxYDistance = parent.h - image.h
-     */
-    private fun getMaxDistance(
-        iv: PhotoWallImageView,
-        imageW: Float? = getImageWidth(iv),
-        imageH: Float? = getImageHeight(iv)
-    ): FloatArray {
-        post {
-            Log.d(TAG,"width $width")
-            Log.d(TAG,"measuredWidth $measuredWidth")
-            Log.d(TAG,"imageWidth ${getImageWidth(iv)}")
-            Log.d(TAG,"screenWidth ${getScreenWidth()}")
-        }
-        return floatArrayOf(
-            width - (imageW ?: getImageWidth(iv)),
-            height - (imageH ?: getImageHeight(iv))
-        )
-    }
-
-    private fun getScreenWidth():Int{
-        return context.resources.displayMetrics.widthPixels
-    }
-
-    /**
-     * 判断是否越界,越界则返回需要的偏移量
-     */
-    private fun getBoundaryOffset(iv: PhotoWallImageView): FloatArray {
-        val imageLocation = getImageLocation(iv)
-        val maxDistance = getMaxDistance(iv)
-
-        /**
-         * 获取左、上越界偏移量 translation 小于0  则取translation - location (减去超出父布局的距离) 反之则取 0
-         */
-        fun getLTOffset(translation: Float, location: Float): Float {
-            return if (translation < 0F) translation - location else 0F
-        }
-
-        fun getRBOffset(translation: Float, location: Float, maxDistance: Float): Float {
-            return if (translation > 0F) translation - (location - maxDistance) else maxDistance
-        }
-
-
-        val dx = when {
-            imageLocation[0] < 0 -> getLTOffset(
-                iv.translationX,
-                imageLocation[0]
-            )// image.x < 0 左越界
-            imageLocation[0] > maxDistance[0] -> getRBOffset(
-                iv.translationX,
-                imageLocation[0],
-                maxDistance[0]
-            ) // image.x > maxX 右越界 偏移量 -(image.x - maxX)
-            else -> -1F
-        }
-        val dy = when {
-            imageLocation[1] < 0 -> getLTOffset(
-                iv.translationY,
-                imageLocation[1]
-            )// image.y < 0 上越界 偏移量 -image.y
-            imageLocation[1] > maxDistance[1] -> getRBOffset(
-                iv.translationY,
-                imageLocation[1],
-                maxDistance[1]
-            ) // image.y > maxY 右越界 偏移量 -(image.y - maxY)
-            else -> -1F
-        }
-        Log.d(TAG, "getBoundaryOffset loc ${imageLocation.asList()}")
-        Log.d(
-            TAG,
-            "getBoundaryOffset translation translationX ${iv.translationX}  translationY ${iv.translationY}"
-        )
-        Log.d(TAG, "getBoundaryOffset max ${maxDistance.asList()}")
-        Log.d(TAG, "getBoundaryOffset dx $dx dy $dy")
-        return floatArrayOf(dx, dy)
-    }
-
-    /**
+     * todo  此方法需要修改
      * 获取当前缩放比
      */
     fun getScale(): Float = finalScale
 
     /**
+     * todo  此方法需要修改
      * 获取当前图片位于Parent相对位置坐标
      */
     fun getRelativeLocation(): ArrayList<FloatArray> {
         val relativeLocationList = arrayListOf<FloatArray>()
         for (iv in imageViewList) {
-            val location = getImageLocation(iv)
+            val location = getImageLocation(iv, this)
             val relativeX = location[0] / width
             val relativeY = location[1] / height
             relativeLocationList.add(floatArrayOf(relativeX, relativeY))
@@ -532,6 +391,7 @@ class PhotoWall : RelativeLayout {
     }
 
     /**
+     * todo  此方法需要修改
      * 复原图
      * @param bitmap [Bitmap] 图片
      * @param relativeLocation 相对父布局坐标比 数组 长度为2
@@ -562,6 +422,7 @@ class PhotoWall : RelativeLayout {
             imageViewList.add(imageView)
             val maxDistance = getMaxDistance(
                 imageView,
+                this,
                 scaleSize(bitmap.width.toFloat()),
                 scaleSize(bitmap.height.toFloat())
             )
@@ -589,38 +450,25 @@ class PhotoWall : RelativeLayout {
 
     }
 
-    /**
-     * 获取两点间距离
-     * @param p1 点1 [PointF]
-     * @param p2 点2 [PointF]
-     *
-     * @return 距离
-     */
-    private fun getDistance(p1: PointF, p2: PointF): Float {
-        return sqrt((p2.x - p1.x.toDouble()).pow(2.0) + (p2.y - p1.y.toDouble()).pow(2.0)).toFloat()
-    }
-
-    /**
-     * 根据两根手指的坐标，设置View的Pivot。
-     */
-    private fun setPivot(view: View, pointer1: PointF, pointer2: PointF) {
-        var newX = (abs(pointer1.x + pointer2.x) / 2 - view.left)
-        newX = if (newX > 0) newX else 0f
-        var newY = (abs(pointer1.y + pointer2.y) / 2 - view.top)
-        newY = if (newY > 0) newY else 0f
-        view.pivotX = newX
-        view.pivotY = newY
-    }
-
-    private fun createImageView():PhotoWallImageView{
-        val imageView = PhotoWallImageView(context)
-        imageView.setScaleType(ImageView.ScaleType.FIT_XY)
-        imageView.setOnDeleteListener(object :PhotoWallImageView.OnClickListener{
+    private fun createImageView(): PhotoWallImageView {
+        return createImageView(context, object : PhotoWallImageView.OnClickListener {
             override fun onClick(view: PhotoWallImageView) {
                 imageViewList.remove(view)
                 removeView(view)
             }
         })
-        return imageView
+    }
+
+    /**
+     * 图片显示监听 用于开放图片加载方式
+     */
+    interface OnDisplayImageListener {
+        /**
+         * 显示图片
+         * @param context 上下文 [Context]
+         * @param img 图片 [Any]
+         * @param iv [ImageView]
+         */
+        fun onDisplayImage(context: Context, img: Any, iv: ImageView)
     }
 }

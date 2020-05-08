@@ -58,14 +58,14 @@ class PhotoWallImageView : RelativeLayout {
         layoutParams.addRule(ALIGN_PARENT_RIGHT)
         textView.layoutParams = layoutParams
 //        textView.text = "移除"
-        
+
         addView(textView)
     }
 
-    fun setDeleteBtnScale(ratio: Float){
-        val correctRatio=  if (ratio < 1f){
-            (1f-ratio) + 1f
-        }else{
+    fun setDeleteBtnScale(ratio: Float) {
+        val correctRatio = if (ratio < 1f) {
+            (1f - ratio) + 1f
+        } else {
             1f
         }
         textView.scaleX = correctRatio
@@ -76,15 +76,17 @@ class PhotoWallImageView : RelativeLayout {
         imageView.setImageBitmap(bm)
     }
 
+    fun getImageView() = imageView
+
     fun setScaleType(scaleType: ImageView.ScaleType) {
         imageView.scaleType = scaleType
     }
 
-    fun setOnDeleteListener(click:OnClickListener){
+    fun setOnDeleteListener(click: OnClickListener) {
         textView.setOnClickListener { click.onClick(this) }
     }
 
-    interface OnClickListener{
+    interface OnClickListener {
         fun onClick(view: PhotoWallImageView)
     }
 }
